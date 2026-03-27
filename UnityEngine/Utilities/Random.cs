@@ -1,168 +1,130 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
-using UnityEngine.Scripting;
 
 namespace UnityEngine
 {
 	public sealed class Random
 	{
+		private static System.Random _rng = new System.Random();
+
 		//
 		// Static Properties
 		//
-		public static Vector2 insideUnitCircle {
-			get {
-				Vector2 result;
-				Random.GetRandomUnitCircle (out result);
-				return result;
+		public static float value
+		{
+			get { return (float)_rng.NextDouble(); }
+		}
+
+		public static Vector2 insideUnitCircle
+		{
+			get
+			{
+				float angle = value * Mathf.PI * 2f;
+				float r = Mathf.Sqrt(value);
+				return new Vector2(Mathf.Cos(angle) * r, Mathf.Sin(angle) * r);
 			}
 		}
 
-		public static Vector3 insideUnitSphere {
-			get {
-				Vector3 result;
-				Random.INTERNAL_get_insideUnitSphere (out result);
-				return result;
+		public static Vector3 insideUnitSphere
+		{
+			get
+			{
+				float theta = value * Mathf.PI * 2f;
+				float phi = Mathf.Acos(2f * value - 1f);
+				float r = Mathf.Pow(value, 1f / 3f);
+				float sinPhi = Mathf.Sin(phi);
+				return new Vector3(
+					r * sinPhi * Mathf.Cos(theta),
+					r * sinPhi * Mathf.Sin(theta),
+					r * Mathf.Cos(phi));
 			}
 		}
 
-		public static Vector3 onUnitSphere {
-			get {
-				Vector3 result;
-				Random.INTERNAL_get_onUnitSphere (out result);
-				return result;
+		public static Vector3 onUnitSphere
+		{
+			get
+			{
+				float theta = value * Mathf.PI * 2f;
+				float phi = Mathf.Acos(2f * value - 1f);
+				float sinPhi = Mathf.Sin(phi);
+				return new Vector3(
+					sinPhi * Mathf.Cos(theta),
+					sinPhi * Mathf.Sin(theta),
+					Mathf.Cos(phi));
 			}
 		}
 
-		public static Quaternion rotation {
-			get {
-				Quaternion result;
-				Random.INTERNAL_get_rotation (out result);
-				return result;
+		public static Quaternion rotation
+		{
+			get
+			{
+				return Quaternion.Euler(value * 360f, value * 360f, value * 360f);
 			}
 		}
 
-		public static Quaternion rotationUniform {
-			get {
-				Quaternion result;
-				Random.INTERNAL_get_rotationUniform (out result);
-				return result;
+		public static Quaternion rotationUniform
+		{
+			get
+			{
+				float u1 = value;
+				float u2 = value;
+				float u3 = value;
+				float sqrt1MinusU1 = Mathf.Sqrt(1f - u1);
+				float sqrtU1 = Mathf.Sqrt(u1);
+				return new Quaternion(
+					sqrt1MinusU1 * Mathf.Sin(2f * Mathf.PI * u2),
+					sqrt1MinusU1 * Mathf.Cos(2f * Mathf.PI * u2),
+					sqrtU1 * Mathf.Sin(2f * Mathf.PI * u3),
+					sqrtU1 * Mathf.Cos(2f * Mathf.PI * u3));
 			}
 		}
 
-		[Obsolete ("Deprecated. Use InitState() function or Random.state property instead.")]
-		public static extern int seed {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			set;
-		}
-
-		public static Random.State state {
-			get {
-				Random.State result;
-				Random.INTERNAL_get_state (out result);
-				return result;
-			}
-			set {
-				Random.INTERNAL_set_state (ref value);
-			}
-		}
-
-		public static extern float value {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-		}
+		public static Random.State state { get; set; }
 
 		//
 		// Static Methods
 		//
-		public static Color ColorHSV (float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax, float alphaMin, float alphaMax)
+		public static void InitState(int seed)
 		{
-			float h = Mathf.Lerp (hueMin, hueMax, Random.value);
-			float s = Mathf.Lerp (saturationMin, saturationMax, Random.value);
-			float v = Mathf.Lerp (valueMin, valueMax, Random.value);
-			Color result = Color.HSVToRGB (h, s, v, true);
-			result.a = Mathf.Lerp (alphaMin, alphaMax, Random.value);
+			_rng = new System.Random(seed);
+		}
+
+		public static float Range(float min, float max)
+		{
+			return min + (float)_rng.NextDouble() * (max - min);
+		}
+
+		public static int Range(int min, int max)
+		{
+			return _rng.Next(min, max);
+		}
+
+		[Obsolete("Use Random.Range instead")]
+		public static float RandomRange(float min, float max) => Range(min, max);
+
+		[Obsolete("Use Random.Range instead")]
+		public static int RandomRange(int min, int max) => Range(min, max);
+
+		public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax, float alphaMin, float alphaMax)
+		{
+			float h = Mathf.Lerp(hueMin, hueMax, Random.value);
+			float s = Mathf.Lerp(saturationMin, saturationMax, Random.value);
+			float v = Mathf.Lerp(valueMin, valueMax, Random.value);
+			Color result = Color.HSVToRGB(h, s, v, true);
+			result.a = Mathf.Lerp(alphaMin, alphaMax, Random.value);
 			return result;
 		}
 
-		public static Color ColorHSV (float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax)
-		{
-			return Random.ColorHSV (hueMin, hueMax, saturationMin, saturationMax, valueMin, valueMax, 1f, 1f);
-		}
+		public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax)
+			=> ColorHSV(hueMin, hueMax, saturationMin, saturationMax, valueMin, valueMax, 1f, 1f);
 
-		public static Color ColorHSV (float hueMin, float hueMax, float saturationMin, float saturationMax)
-		{
-			return Random.ColorHSV (hueMin, hueMax, saturationMin, saturationMax, 0f, 1f, 1f, 1f);
-		}
+		public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax)
+			=> ColorHSV(hueMin, hueMax, saturationMin, saturationMax, 0f, 1f, 1f, 1f);
 
-		public static Color ColorHSV (float hueMin, float hueMax)
-		{
-			return Random.ColorHSV (hueMin, hueMax, 0f, 1f, 0f, 1f, 1f, 1f);
-		}
+		public static Color ColorHSV(float hueMin, float hueMax)
+			=> ColorHSV(hueMin, hueMax, 0f, 1f, 0f, 1f, 1f, 1f);
 
-		public static Color ColorHSV ()
-		{
-			return Random.ColorHSV (0f, 1f, 0f, 1f, 0f, 1f, 1f, 1f);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void GetRandomUnitCircle (out Vector2 output);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern void InitState (int seed);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_get_insideUnitSphere (out Vector3 value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_get_onUnitSphere (out Vector3 value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_get_rotation (out Quaternion value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_get_rotationUniform (out Quaternion value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_get_state (out Random.State value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_set_state (ref Random.State value);
-
-		[Obsolete ("Use Random.Range instead")]
-		public static float RandomRange (float min, float max)
-		{
-			return Random.Range (min, max);
-		}
-
-		[Obsolete ("Use Random.Range instead")]
-		public static int RandomRange (int min, int max)
-		{
-			return Random.Range (min, max);
-		}
-
-		public static int Range (int min, int max)
-		{
-			System.Random r = new System.Random();
-			int rInt = r.Next(min, max);
-			return rInt;
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern float Range (float min, float max);
+		public static Color ColorHSV()
+			=> ColorHSV(0f, 1f, 0f, 1f, 0f, 1f, 1f, 1f);
 
 		//
 		// Nested Types

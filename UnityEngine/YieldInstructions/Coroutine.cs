@@ -8,12 +8,12 @@ namespace UnityEngine
 	[StructLayout (LayoutKind.Sequential)]
 	public sealed class Coroutine : CustomYieldInstruction
 	{
-		IEnumerator routine;
+		internal IEnumerator enumerator;
 
 
 		public Coroutine (IEnumerator routine)
 		{
-			this.routine = routine;
+			this.enumerator = routine;
 		}
 
 
@@ -21,7 +21,7 @@ namespace UnityEngine
 		{
 			get
 			{
-				return routine.MoveNext();
+				return enumerator.MoveNext();
 			}
 		}
 	}

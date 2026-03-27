@@ -123,11 +123,9 @@ namespace UnityEngine
 
 		public static Coroutine StartCoroutine(this Node node, IEnumerator routine)
 		{
-			MonoBehaviourController controller = UnityEngineAutoLoad.Instance.GetMonoBehaviourController(node);
-
-			if ( controller != null )
+			if (node is MonoBehaviour mb)
 			{
-				controller.coroutines.Add(routine);
+				return mb.StartCoroutine(routine);
 			}
 
 			return new Coroutine(routine);
@@ -136,7 +134,7 @@ namespace UnityEngine
 
 		public static void Destroy (this Object obj)
 		{
-			obj.Free();
+			Object.Destroy(obj);
 		}
 	}
 }

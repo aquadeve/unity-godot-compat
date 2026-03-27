@@ -1,6 +1,6 @@
 ﻿namespace UnityEngine.UI
 {
-	public class Canvas : MonoBehaviour
+	public partial class Canvas : MonoBehaviour
 	{
 	}
 }

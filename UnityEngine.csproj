@@ -7,4 +7,8 @@
     <Nullable>enable</Nullable>
     <DefineConstants>NOT_UNITY</DefineConstants>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Exclude the reference folder from compilation; it is for reference only -->
+    <Compile Remove="united-godot-main/**" />
+  </ItemGroup>
 </Project>
