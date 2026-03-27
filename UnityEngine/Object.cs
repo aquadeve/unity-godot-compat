@@ -9,14 +9,18 @@ namespace UnityEngine
 
 		public static void Destroy(Object obj, float t = 0f)
 		{
-			if (obj is Node node)
-				node.QueueFree();
+			if (obj is GameObject go)
+				go.godot.QueueFree();
+			else if (obj is Component c)
+				c.gameObject?.godot?.QueueFree();
 		}
 
 		public static void DestroyImmediate(Object obj)
 		{
-			if (obj is Node node)
-				node.Free();
+			if (obj is GameObject go)
+				go.godot.Free();
+			else if (obj is Component c)
+				c.gameObject?.godot?.Free();
 		}
 
 		public static void DontDestroyOnLoad(Object obj)

@@ -683,10 +683,10 @@ namespace UnityEngine.Networking
 			return asyncOp;
 		}
 
-		void HandleRequest(object state)
+		void HandleRequest(object? state)
 		{
-			AsyncOperation asyncOp = (AsyncOperation)state;
-			Godot.HTTPClient client = new Godot.HTTPClient();
+			AsyncOperation asyncOp = (AsyncOperation)state!;
+			Godot.HttpClient client = new Godot.HttpClient();
 
 			List<string> headersList = new List<string>();
 
@@ -699,7 +699,7 @@ namespace UnityEngine.Networking
 				headersList.Add(key + ": " + headers[key]);
 			}
 
-			client.Request((Godot.HTTPClient.Method)_method, url, headersList.ToArray());
+			client.Request((Godot.HttpClient.Method)_method, url, headersList.ToArray());
 
 			do
 			{
@@ -708,7 +708,7 @@ namespace UnityEngine.Networking
 				Debug.Log(client.GetStatus());
 				Debug.Log(client.GetResponseBodyLength());
 			}
-			while (client.GetStatus() == Godot.HTTPClient.Status.Connected || client.GetStatus() == Godot.HTTPClient.Status.Requesting);
+			while (client.GetStatus() == Godot.HttpClient.Status.Connected || client.GetStatus() == Godot.HttpClient.Status.Requesting);
 
 			Debug.Log("Stat: " + client.GetStatus());
 			Debug.Log(client.GetResponseBodyLength());

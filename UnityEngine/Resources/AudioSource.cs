@@ -1,6 +1,6 @@
 ﻿namespace UnityEngine
 {
-	public class AudioSource : MonoBehaviour
+	public partial class AudioSource : MonoBehaviour
 	{
 		public float spatialBlend = 1.0f;
 

@@ -1,0 +1,17 @@
+namespace UnityEngine
+{
+	/// <summary>
+	/// The language the user's operating system is running in.
+	/// </summary>
+	public enum SystemLanguage
+	{
+		Afrikaans, Arabic, Basque, Belarusian, Bulgarian, Catalan,
+		Chinese, Czech, Danish, Dutch, English, Estonian, Faroese,
+		Finnish, French, German, Greek, Hebrew, Hugarian, Icelandic,
+		Indonesian, Italian, Japanese, Korean, Latvian, Lithuanian,
+		Norwegian, Polish, Portuguese, Romanian, Russian,
+		SerboCroatian, Slovak, Slovenian, Spanish, Swedish,
+		Thai, Turkish, Ukrainian, Vietnamese, ChineseSimplified,
+		ChineseTraditional, Unknown, Hungarian
+	}
+}

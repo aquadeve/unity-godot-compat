@@ -6,6 +6,17 @@ namespace UnityEngine
 {
 	public class Texture2D : Texture
 	{
+		/// <summary>EXR output flags (used by ImageConversion).</summary>
+		[Flags]
+		public enum EXRFlags
+		{
+			None = 0,
+			OutputAsFloat = 1,
+			CompressZIP = 2,
+			CompressRLE = 4,
+			CompressPIZ = 8
+		}
+
 		private Godot.Texture2D? _tex;
 
 		public override int width  => _tex?.GetWidth()  ?? _width;
@@ -33,10 +44,8 @@ namespace UnityEngine
 			_width = width;
 			_height = height;
 			this.format = format;
-			var img = Image.CreateEmpty(width, height, mipmap, Image.Format.Rgba8);
-			var tex = new ImageTexture();
-			tex.CreateFromImage(img);
-			_tex = tex;
+			var img = Image.Create(width, height, mipmap, Image.Format.Rgba8);
+			_tex = ImageTexture.CreateFromImage(img);
 		}
 
 		internal Texture2D(Godot.Texture2D godotTexture)
@@ -145,9 +154,7 @@ namespace UnityEngine
 				bytes[i * 4 + 3] = (byte)Mathf.RoundToInt(_pixelData[i].a * 255);
 			}
 			var img = Image.CreateFromData(_width, _height, false, Image.Format.Rgba8, bytes);
-			var tex = new ImageTexture();
-			tex.CreateFromImage(img);
-			_tex = tex;
+			_tex = ImageTexture.CreateFromImage(img);
 			if (makeNoLongerReadable) isReadable = false;
 		}
 
@@ -163,8 +170,7 @@ namespace UnityEngine
 				{
 					_width  = img.GetWidth();
 					_height = img.GetHeight();
-					var tex = new ImageTexture();
-					tex.CreateFromImage(img);
+					var tex = ImageTexture.CreateFromImage(img);
 					_tex = tex;
 				}
 				else
@@ -195,10 +201,8 @@ namespace UnityEngine
 			_height = height;
 			this.format = format;
 			_pixelData = null;
-			var img = Image.CreateEmpty(width, height, hasMipMap, Image.Format.Rgba8);
-			var tex = new ImageTexture();
-			tex.CreateFromImage(img);
-			_tex = tex;
+			var img = Image.Create(width, height, hasMipMap, Image.Format.Rgba8);
+			_tex = ImageTexture.CreateFromImage(img);
 			return true;
 		}
 

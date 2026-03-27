@@ -51,5 +51,11 @@ namespace UnityEngine
 
 		public T[] GetComponentsInChildren<T>() where T : class, IComponent, new()
 			=> gameObject.GetComponentsInChildren<T>();
+
+		public T? GetComponentInParent<T>() where T : class, IComponent, new()
+			=> gameObject.GetComponentInParent<T>();
+
+		public T[] GetComponentsInParent<T>() where T : class, IComponent, new()
+			=> gameObject.GetComponentsInParent<T>();
 	}
 }

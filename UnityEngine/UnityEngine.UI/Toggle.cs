@@ -1,6 +1,6 @@
 ﻿namespace UnityEngine.UI
 {
-	public class Toggle : MonoBehaviour
+	public partial class Toggle : MonoBehaviour
 	{
 		public bool isOn = false;
 	}

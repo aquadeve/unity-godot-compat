@@ -167,6 +167,34 @@ namespace UnityEngine
 			return results.ToArray();
 		}
 
+		public T? GetComponentInParent<T>() where T : class, IComponent, new()
+		{
+			var result = GetComponent<T>();
+			if (result != null) return result;
+
+			var parentNode = godot.GetParent() as Node3D;
+			if (parentNode != null)
+			{
+				var parentGO = UGGameObjectHelper.GetOrCreate(parentNode);
+				return parentGO.GetComponentInParent<T>();
+			}
+			return null;
+		}
+
+		public T[] GetComponentsInParent<T>() where T : class, IComponent, new()
+		{
+			var results = new List<T>();
+			results.AddRange(GetComponents<T>());
+
+			var parentNode = godot.GetParent() as Node3D;
+			if (parentNode != null)
+			{
+				var parentGO = UGGameObjectHelper.GetOrCreate(parentNode);
+				results.AddRange(parentGO.GetComponentsInParent<T>());
+			}
+			return results.ToArray();
+		}
+
 		// ---- Scene API ----
 		public void SetActive(bool value)
 		{

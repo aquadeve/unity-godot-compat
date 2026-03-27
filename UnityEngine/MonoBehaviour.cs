@@ -14,6 +14,7 @@ namespace UnityEngine
 		// ---- IComponent ----
 		private bool _enabled = true;
 		private GameObject? _gameObject;
+		private readonly Dictionary<string, SceneTreeTimer> _invokeTimers = new();
 
 		public bool enabled
 		{
@@ -165,14 +166,14 @@ namespace UnityEngine
 
 		public void StopAllCoroutines() => _coroutines.Clear();
 
-		public static void Destroy(Object obj, float t = 0f)
+		public static new void Destroy(Object obj, float t = 0f)
 		{
-			if (obj is Node node) node.QueueFree();
+			Object.Destroy(obj, t);
 		}
 
-		public static void DestroyImmediate(Object obj)
+		public static new void DestroyImmediate(Object obj)
 		{
-			if (obj is Node node) node.Free();
+			Object.DestroyImmediate(obj);
 		}
 
 		public static void DontDestroyOnLoad(Object obj) { /* no-op */ }
@@ -189,12 +190,76 @@ namespace UnityEngine
 		public T[] GetComponentsInChildren<T>() where T : class, IComponent, new()
 			=> gameObject?.GetComponentsInChildren<T>() ?? Array.Empty<T>();
 
+		public T? GetComponentInParent<T>() where T : class, IComponent, new()
+			=> gameObject?.GetComponentInParent<T>();
+
+		public T[] GetComponentsInParent<T>() where T : class, IComponent, new()
+			=> gameObject?.GetComponentsInParent<T>() ?? Array.Empty<T>();
+
 		public bool CompareTag(string tag) => this.IsInGroup(tag);
 
-		public void Invoke(string methodName, float time) => throw new NotImplementedException();
-		public bool IsInvoking(string methodName) => false;
-		public void CancelInvoke(string methodName) { }
-		public void CancelInvoke() { }
+		public void Invoke(string methodName, float time)
+		{
+			var method = GetType().GetMethod(methodName,
+				BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+			if (method == null)
+			{
+				Debug.LogError($"MonoBehaviour.Invoke: method '{methodName}' not found on {GetType().FullName}");
+				return;
+			}
+			var tree = GetTree();
+			if (tree == null) return;
+			var timer = tree.CreateTimer(time);
+			_invokeTimers[methodName] = timer;
+			timer.Timeout += () =>
+			{
+				_invokeTimers.Remove(methodName);
+				method.Invoke(this, null);
+			};
+		}
+
+		public void InvokeRepeating(string methodName, float time, float repeatRate)
+		{
+			var method = GetType().GetMethod(methodName,
+				BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+			if (method == null)
+			{
+				Debug.LogError($"MonoBehaviour.InvokeRepeating: method '{methodName}' not found on {GetType().FullName}");
+				return;
+			}
+			InvokeRepeatingInternal(method, methodName, time, repeatRate);
+		}
+
+		private async void InvokeRepeatingInternal(MethodInfo method, string methodName, float initialDelay, float repeatRate)
+		{
+			var tree = GetTree();
+			if (tree == null) return;
+			var timer = tree.CreateTimer(initialDelay);
+			_invokeTimers[methodName] = timer;
+			await ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+
+			while (IsInsideTree() && _invokeTimers.ContainsKey(methodName))
+			{
+				method.Invoke(this, null);
+				timer = GetTree()?.CreateTimer(repeatRate)!;
+				if (timer == null) break;
+				_invokeTimers[methodName] = timer;
+				await ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+			}
+		}
+
+		public bool IsInvoking(string methodName) => _invokeTimers.ContainsKey(methodName);
+		public bool IsInvoking() => _invokeTimers.Count > 0;
+
+		public void CancelInvoke(string methodName)
+		{
+			_invokeTimers.Remove(methodName);
+		}
+
+		public void CancelInvoke()
+		{
+			_invokeTimers.Clear();
+		}
 
 		public void SendMessage(string methodName, object? value = null) { }
 		public void SendMessageUpwards(string methodName, object? value = null) { }

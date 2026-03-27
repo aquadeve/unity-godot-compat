@@ -11,14 +11,12 @@ namespace UnityEngine
 		{
 			get
 			{
-				Debug.Log("targetFrameRate not implemented");
-				return (int)Engine.GetTargetFps();
+				return Engine.MaxFps;
 			}
 
 			set
 			{
-				Debug.Log("targetFrameRate not implemented");
-				Engine.SetTargetFps(value);
+				Engine.MaxFps = value;
 			}
 		}
 
@@ -104,7 +102,7 @@ namespace UnityEngine
 
 		public static void OpenURL(string url)
 		{
-			throw new NotImplementedException();
+			OS.ShellOpen(url);
 		}
 
 
@@ -112,6 +110,20 @@ namespace UnityEngine
 		{
 			UnityEngineAutoLoad.Instance.Quit();
 		}
+
+		public static string productName
+		{
+			get => (string)ProjectSettings.GetSetting("application/config/name");
+		}
+
+		public static string companyName { get; set; } = "";
+		public static string version { get; set; } = "1.0";
+		public static string unityVersion => "2021.3.0f1"; // compat stub
+		public static bool isFocused => true;
+		public static bool isMobilePlatform => platform == RuntimePlatform.Android || platform == RuntimePlatform.IPhonePlayer;
+		public static SystemLanguage systemLanguage => SystemLanguage.English;
+		public static string streamingAssetsPath => "res://StreamingAssets";
+		public static string temporaryCachePath => OS.GetCacheDir();
 	}
 
 

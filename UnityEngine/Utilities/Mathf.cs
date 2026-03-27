@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine.Internal;
 using UnityEngine.Scripting;
+using UnityEngineInternal;
 
 namespace UnityEngine
 {
