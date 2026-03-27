@@ -63,7 +63,7 @@ namespace UnityEngine
 	}
 
 	/// <summary>
-	/// Attribute to delay a field's color in the inspector.
+	/// Attribute to define a field's color usage in the inspector.
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Field)]
 	public sealed class ColorUsageAttribute : Attribute
