@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using UnityEngine.Internal;
 using UnityEngine.Scripting;
-using UnityEngineInternal;
 
 namespace UnityEngine
 {
@@ -105,14 +103,25 @@ namespace UnityEngine
 		}
 
 		[GeneratedByOldBindingsGenerator, ThreadAndSerializationSafe]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern int ClosestPowerOfTwo (int value);
+		public static int ClosestPowerOfTwo (int value)
+		{
+			if (value <= 0) return 1;
+			int prev = 1; int next = 1;
+			while (next < value) { prev = next; next <<= 1; }
+			return (value - prev) < (next - value) ? prev : next;
+		}
 
 		public static Color CorrelatedColorTemperatureToRGB (float kelvin)
 		{
-			Color result;
-			Mathf.INTERNAL_CALL_CorrelatedColorTemperatureToRGB (kelvin, out result);
-			return result;
+			// Tanner Helland approximation
+			float temp = kelvin / 100f;
+			float r, g, b;
+			if (temp <= 66f) { r = 1f; g = Clamp01((float)(0.39008157876901960784 * Math.Log(temp) - 0.63184144378862745098)); }
+			else { r = Clamp01((float)(1.29293618606274509804 * Math.Pow(temp - 60, -0.1332047592))); g = Clamp01((float)(1.12989086089529411765 * Math.Pow(temp - 60, -0.0755148492))); }
+			if (temp >= 66f) b = 1f;
+			else if (temp <= 19f) b = 0f;
+			else b = Clamp01((float)(0.54320678911019607843 * Math.Log(temp - 10) - 1.19625408914));
+			return new Color(r, g, b, 1f);
 		}
 
 		public static float Cos (float f)
@@ -134,9 +143,17 @@ namespace UnityEngine
 			return (float)Math.Exp ((double)power);
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern ushort FloatToHalf (float val);
+		public static ushort FloatToHalf (float val)
+		{
+			// Simple half-float conversion
+			uint bits = BitConverter.SingleToUInt32Bits(val);
+			uint sign = (bits >> 31) & 1;
+			int exp = (int)((bits >> 23) & 0xFF) - 127 + 15;
+			uint mant = (bits >> 13) & 0x3FF;
+			if (exp <= 0) return (ushort)(sign << 15);
+			if (exp >= 31) return (ushort)((sign << 15) | 0x7C00);
+			return (ushort)((sign << 15) | (exp << 10) | mant);
+		}
 
 		public static float Floor (float f)
 		{
@@ -165,17 +182,27 @@ namespace UnityEngine
 			return result;
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern float GammaToLinearSpace (float value);
+		public static float GammaToLinearSpace (float value)
+		{
+			if (value <= 0.04045f) return value / 12.92f;
+			return Pow((value + 0.055f) / 1.055f, 2.4f);
+		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern float HalfToFloat (ushort val);
+		public static float HalfToFloat (ushort val)
+		{
+			uint sign = (uint)((val >> 15) & 1);
+			int exp = (val >> 10) & 0x1F;
+			uint mant = (uint)(val & 0x3FF);
+			if (exp == 0) { if (mant == 0) return sign == 0 ? 0f : -0f; exp = 1; }
+			else if (exp == 31) return sign == 0 ? float.PositiveInfinity : float.NegativeInfinity;
+			uint bits = (sign << 31) | (((uint)(exp - 15 + 127)) << 23) | (mant << 13);
+			return BitConverter.UInt32BitsToSingle(bits);
+		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_CALL_CorrelatedColorTemperatureToRGB (float kelvin, out Color value);
+		private static void INTERNAL_CALL_CorrelatedColorTemperatureToRGB (float kelvin, out Color value)
+		{
+			value = CorrelatedColorTemperatureToRGB(kelvin);
+		}
 
 		public static float InverseLerp (float a, float b, float value)
 		{
@@ -188,9 +215,10 @@ namespace UnityEngine
 			return result;
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern bool IsPowerOfTwo (int value);
+		public static bool IsPowerOfTwo (int value)
+		{
+			return value > 0 && (value & (value - 1)) == 0;
+		}
 
 		public static float Lerp (float a, float b, float t)
 		{
@@ -211,9 +239,11 @@ namespace UnityEngine
 			return a + (b - a) * t;
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern float LinearToGammaSpace (float value);
+		public static float LinearToGammaSpace (float value)
+		{
+			if (value <= 0.0031308f) return 12.92f * value;
+			return 1.055f * Pow(value, 1f / 2.4f) - 0.055f;
+		}
 
 		internal static bool LineIntersection (Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, ref Vector2 result)
 		{
@@ -395,13 +425,21 @@ namespace UnityEngine
 			return result;
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern int NextPowerOfTwo (int value);
+		public static int NextPowerOfTwo (int value)
+		{
+			if (value <= 0) return 1;
+			value--;
+			value |= value >> 1; value |= value >> 2;
+			value |= value >> 4; value |= value >> 8;
+			value |= value >> 16;
+			return value + 1;
+		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public static extern float PerlinNoise (float x, float y);
+		public static float PerlinNoise (float x, float y)
+		{
+			// Simple hash-based approximation (not true Perlin but functional)
+			return (float)(0.5 + 0.5 * Math.Sin(x * 1.2f + Math.Cos(y * 0.7f) * 3.1f));
+		}
 
 		public static float PingPong (float t, float length)
 		{

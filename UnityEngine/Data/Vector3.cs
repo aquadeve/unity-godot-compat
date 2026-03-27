@@ -20,9 +20,9 @@ namespace UnityEngine
 		public static readonly Vector3 up = new Vector3 (0f, 1f, 0f);
 
 
-		public float x { get { return vec.x; } set { vec.x = value; } }
-		public float y { get { return vec.y; } set { vec.y = value; } }
-		public float z { get { return vec.z; } set { vec.z = value; } }
+		public float x { get { return vec.X; } set { vec.X = value; } }
+		public float y { get { return vec.Y; } set { vec.Y = value; } }
+		public float z { get { return vec.Z; } set { vec.Z = value; } }
 
 
 		//
@@ -30,17 +30,17 @@ namespace UnityEngine
 		//
 		public Vector3 (float x, float y)
 		{
-			vec.x = x;
-			vec.y = y;
-			vec.z = 0f;
+			vec.X = x;
+			vec.Y = y;
+			vec.Z = 0f;
 		}
 
 
 		public Vector3(float x, float y, float z)
         {
-            vec.x = x;
-            vec.y = y;
-            vec.z = z;
+            vec.X = x;
+            vec.Y = y;
+            vec.Z = z;
         }
 
 
@@ -55,7 +55,7 @@ namespace UnityEngine
 
 		public static implicit operator Vector3 (Godot.Vector3 vec)
 		{
-			return new Vector3(vec.x, vec.y, vec.z);
+			return new Vector3(vec.X, vec.Y, vec.Z);
 		}
 
 
@@ -67,13 +67,13 @@ namespace UnityEngine
 				float result;
 				switch (index) {
 					case 0:
-						result = vec.x;
+						result = vec.X;
 						break;
 					case 1:
-						result = vec.y;
+						result = vec.Y;
 						break;
 					case 2:
-						result = vec.z;
+						result = vec.Z;
 						break;
 					default:
 						throw new IndexOutOfRangeException ("Invalid Vector3 index!");
@@ -83,13 +83,13 @@ namespace UnityEngine
 			set {
 				switch (index) {
 					case 0:
-						vec.x = value;
+						vec.X = value;
 						break;
 					case 1:
-						vec.y = value;
+						vec.Y = value;
 						break;
 					case 2:
-						vec.z = value;
+						vec.Z = value;
 						break;
 					default:
 						throw new IndexOutOfRangeException ("Invalid Vector3 index!");
@@ -149,7 +149,7 @@ namespace UnityEngine
 		{
 			get
 			{
-				return Mathf.Sqrt (vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+				return Mathf.Sqrt (vec.X * vec.X + vec.Y * vec.Y + vec.Z * vec.Z);
 			}
 		}
 
@@ -165,7 +165,7 @@ namespace UnityEngine
 		{
 			get
 			{
-				return vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
+				return vec.X * vec.X + vec.Y * vec.Y + vec.Z * vec.Z;
 			}
 		}
 
@@ -374,48 +374,50 @@ namespace UnityEngine
 				result = false;
 			} else {
 				Vector3 vector = (Vector3)other;
-				result = (vec.x.Equals (vector.x) && vec.y.Equals (vector.y) && vec.z.Equals (vector.z));
+				result = (vec.X.Equals (vector.x) && vec.Y.Equals (vector.y) && vec.Z.Equals (vector.z));
 			}
 			return result;
 		}
 
 		public override int GetHashCode ()
 		{
-			return vec.x.GetHashCode () ^ vec.y.GetHashCode () << 2 ^ vec.z.GetHashCode () >> 2;
+			return vec.X.GetHashCode () ^ vec.Y.GetHashCode () << 2 ^ vec.Z.GetHashCode () >> 2;
 		}
 
 		public void Normalize ()
 		{
 			float num = Vector3.Magnitude (this);
 			if (num > 1E-05f) {
-				vec /= num;
+				vec.X /= num;
+				vec.Y /= num;
+				vec.Z /= num;
 			} else {
-				vec = Vector3.zero;
+				vec = Godot.Vector3.Zero;
 			}
 		}
 
 		public void Scale (Vector3 scale)
 		{
-			vec.x *= scale.x;
-			vec.y *= scale.y;
-			vec.z *= scale.z;
+			vec.X *= scale.x;
+			vec.Y *= scale.y;
+			vec.Z *= scale.z;
 		}
 
 		public void Set (float newX, float newY, float newZ)
 		{
-			vec.x = newX;
-			vec.y = newY;
-			vec.z = newZ;
+			vec.X = newX;
+			vec.Y = newY;
+			vec.Z = newZ;
 		}
 
 		public string ToString (string format)
 		{
-			return string.Format ("({0}, {1}, {2})", vec.x.ToString (format), vec.y.ToString (format), vec.z.ToString (format));
+			return string.Format ("({0}, {1}, {2})", vec.X.ToString (format), vec.Y.ToString (format), vec.Z.ToString (format));
 		}
 
 		public override string ToString ()
 		{
-			return string.Format ("({0:F1}, {1:F1}, {2:F1})", vec.x, vec.y, vec.z);
+			return string.Format ("({0:F1}, {1:F1}, {2:F1})", vec.X, vec.Y, vec.Z);
 		}
 	}
 }

@@ -368,5 +368,15 @@ namespace UnityEngine
 		{
 			return new Vector2 (-a.x, -a.y);
 		}
+
+		public static implicit operator Godot.Vector2 (Vector2 v)
+		{
+			return new Godot.Vector2(v.x, v.y);
+		}
+
+		public static implicit operator Vector2 (Godot.Vector2 v)
+		{
+			return new Vector2(v.X, v.Y);
+		}
 	}
 }

@@ -1,445 +1,226 @@
-﻿using System;
-using System.Drawing;
+using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using UnityEngine.Internal;
-using UnityEngine.Scripting;
+using Godot;
 
 namespace UnityEngine
 {
 	public class Texture2D : Texture
 	{
-		Godot.ImageTexture _texture = null;
+		private Godot.Texture2D? _tex;
 
-		//
-		// Static Properties
-		//
-		public static extern Texture2D blackTexture {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-		}
+		public override int width  => _tex?.GetWidth()  ?? _width;
+		public override int height => _tex?.GetHeight() ?? _height;
+		private int _width;
+		private int _height;
 
-		public static extern Texture2D whiteTexture {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-		}
+		public override Godot.Texture2D? godotTex => _tex;
 
-		//
-		// Properties
-		//
-		public extern bool alphaIsTransparency {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			set;
-		}
-
-		public extern TextureFormat format {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-		}
-
-		public extern int mipmapCount {
-			[GeneratedByOldBindingsGenerator]
-			[MethodImpl (MethodImplOptions.InternalCall)]
-			get;
-		}
-
-		//
-		// Constructors
-		//
-		public Texture2D (int width, int height)
+		// Internal Godot texture for material usage
+		public Godot.Texture2D? godot
 		{
-			Internal_Create (this, width, height, TextureFormat.RGBA32, true, false, IntPtr.Zero);
+			get => _tex;
+			set => _tex = value;
 		}
 
-		public Texture2D (int width, int height, TextureFormat format, bool mipmap)
+		public TextureFormat format { get; private set; } = TextureFormat.RGBA32;
+		public bool alphaIsTransparency { get; set; } = true;
+		public int mipmapCount => 1;
+		public bool isReadable { get; private set; } = true;
+
+		// ---- Constructors ----
+		public Texture2D(int width, int height, TextureFormat format = TextureFormat.RGBA32, bool mipmap = false, bool linear = false)
 		{
-			Internal_Create (this, width, height, format, mipmap, false, IntPtr.Zero);
+			_width = width;
+			_height = height;
+			this.format = format;
+			var img = Image.CreateEmpty(width, height, mipmap, Image.Format.Rgba8);
+			var tex = new ImageTexture();
+			tex.CreateFromImage(img);
+			_tex = tex;
 		}
 
-		public Texture2D (int width, int height, TextureFormat format, bool mipmap, bool linear)
+		internal Texture2D(Godot.Texture2D godotTexture)
 		{
-			Internal_Create (this, width, height, format, mipmap, linear, IntPtr.Zero);
+			_tex = godotTexture;
 		}
 
-		internal Texture2D (int width, int height, TextureFormat format, bool mipmap, bool linear, IntPtr nativeTex)
+		internal Texture2D(byte[] data)
 		{
-			Internal_Create (this, width, height, format, mipmap, linear, nativeTex);
-		}
-
-		internal Texture2D (byte[] data)
-		{
-			_texture = new Godot.ImageTexture();
 			LoadRawTextureData(data);
 		}
 
-		private Texture2D(Godot.ImageTexture texture)
+		// ---- Statics ----
+		public static Texture2D? whiteTexture
 		{
-			_texture = texture;
+			get
+			{
+				var t = new Texture2D(4, 4, TextureFormat.RGBA32);
+				t.SetPixels(new Color[] { Color.white, Color.white, Color.white, Color.white });
+				t.Apply();
+				return t;
+			}
 		}
 
-		//
-		// Conversion Methods
-		//
-		public static implicit operator Godot.ImageTexture (Texture2D texture2D)
+		public static Texture2D? blackTexture
 		{
-			return texture2D._texture;
+			get
+			{
+				var t = new Texture2D(4, 4, TextureFormat.RGBA32);
+				t.SetPixels(new Color[] { Color.black, Color.black, Color.black, Color.black });
+				t.Apply();
+				return t;
+			}
 		}
 
+		// ---- Pixel operations ----
+		private Color[]? _pixelData;
 
-		public static implicit operator Texture2D (Godot.ImageTexture godotImageTexture)
+		public void SetPixel(int x, int y, Color color)
 		{
-			return new Texture2D(godotImageTexture);
+			EnsurePixelData();
+			int idx = y * _width + x;
+			if (idx >= 0 && idx < _pixelData!.Length)
+				_pixelData[idx] = color;
 		}
 
-		//
-		// Static Methods
-		//
-		public static Texture2D CreateExternalTexture (int width, int height, TextureFormat format, bool mipmap, bool linear, IntPtr nativeTex)
+		public Color GetPixel(int x, int y)
 		{
-			if (nativeTex == IntPtr.Zero) {
-				throw new ArgumentException ("nativeTex can not be null");
-			}
-			return new Texture2D (width, height, format, mipmap, linear, nativeTex);
+			EnsurePixelData();
+			int idx = y * _width + x;
+			if (idx >= 0 && idx < _pixelData!.Length)
+				return _pixelData[idx];
+			return Color.black;
 		}
 
-		public static bool GenerateAtlas (Vector2[] sizes, int padding, int atlasSize, List<Rect> results)
+		public Color GetPixelBilinear(float u, float v)
 		{
-			if (sizes == null) {
-				throw new ArgumentException ("sizes array can not be null");
-			}
-			if (results == null) {
-				throw new ArgumentException ("results list cannot be null");
-			}
-			if (padding < 0) {
-				throw new ArgumentException ("padding can not be negative");
-			}
-			if (atlasSize <= 0) {
-				throw new ArgumentException ("atlas size must be positive");
-			}
-			results.Clear ();
-			bool result;
-			if (sizes.Length == 0) {
-				result = true;
-			} else {
-				Texture2D.GenerateAtlasInternal (sizes, padding, atlasSize, results);
-				result = (results.Count != 0);
-			}
+			int x = Mathf.FloorToInt(u * (_width - 1));
+			int y = Mathf.FloorToInt(v * (_height - 1));
+			return GetPixel(x, y);
+		}
+
+		public Color[] GetPixels(int miplevel = 0)
+		{
+			EnsurePixelData();
+			return _pixelData ?? Array.Empty<Color>();
+		}
+
+		public Color[] GetPixels(int x, int y, int blockWidth, int blockHeight, int miplevel = 0)
+		{
+			EnsurePixelData();
+			var result = new Color[blockWidth * blockHeight];
+			for (int j = 0; j < blockHeight; j++)
+				for (int i = 0; i < blockWidth; i++)
+					result[j * blockWidth + i] = GetPixel(x + i, y + j);
 			return result;
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void GenerateAtlasInternal (Vector2[] sizes, int padding, int atlasSize, object resultList);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_CALL_Compress (Texture2D self, bool highQuality);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_CALL_GetPixel (Texture2D self, int x, int y, out Color value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_CALL_GetPixelBilinear (Texture2D self, float u, float v, out Color value);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_CALL_ReadPixels (Texture2D self, ref Rect source, int destX, int destY, bool recalculateMipMaps);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private static extern void INTERNAL_CALL_SetPixel (Texture2D self, int x, int y, ref Color color);
-
-		private static void Internal_Create (Texture2D mono, int width, int height, TextureFormat format, bool mipmap, bool linear, IntPtr nativeTex)
+		public void SetPixels(Color[] colors, int miplevel = 0)
 		{
-			mono._texture = new Godot.ImageTexture();
+			EnsurePixelData();
+			int count = Math.Min(colors.Length, _pixelData!.Length);
+			Array.Copy(colors, _pixelData, count);
 		}
 
-		//
-		// Methods
-		//
-		[ExcludeFromDocs]
-		public void Apply (bool updateMipmaps)
+		public void SetPixels(int x, int y, int blockWidth, int blockHeight, Color[] colors, int miplevel = 0)
 		{
-			bool makeNoLongerReadable = false;
-			this.Apply (updateMipmaps, makeNoLongerReadable);
+			for (int j = 0; j < blockHeight; j++)
+				for (int i = 0; i < blockWidth; i++)
+				{
+					int idx = j * blockWidth + i;
+					if (idx < colors.Length)
+						SetPixel(x + i, y + j, colors[idx]);
+				}
 		}
 
-		[ExcludeFromDocs]
-		public void Apply ()
+		public void Apply(bool updateMipmaps = true, bool makeNoLongerReadable = false)
 		{
-			bool makeNoLongerReadable = false;
-			bool updateMipmaps = true;
-			this.Apply (updateMipmaps, makeNoLongerReadable);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern void Apply ([DefaultValue ("true")] bool updateMipmaps, [DefaultValue ("false")] bool makeNoLongerReadable);
-
-		public void Compress (bool highQuality)
-		{
-			Texture2D.INTERNAL_CALL_Compress (this, highQuality);
-		}
-
-		public Color GetPixel (int x, int y)
-		{
-			Color result;
-			Texture2D.INTERNAL_CALL_GetPixel (this, x, y, out result);
-			return result;
-		}
-
-		public Color GetPixelBilinear (float u, float v)
-		{
-			Color result;
-			Texture2D.INTERNAL_CALL_GetPixelBilinear (this, u, v, out result);
-			return result;
-		}
-
-		[ExcludeFromDocs]
-		public Color[] GetPixels ()
-		{
-			int miplevel = 0;
-			return this.GetPixels (miplevel);
-		}
-
-		[ExcludeFromDocs]
-		public Color[] GetPixels (int x, int y, int blockWidth, int blockHeight)
-		{
-			int miplevel = 0;
-			return this.GetPixels (x, y, blockWidth, blockHeight, miplevel);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern Color[] GetPixels (int x, int y, int blockWidth, int blockHeight, [DefaultValue ("0")] int miplevel);
-
-		public Color[] GetPixels ([DefaultValue ("0")] int miplevel)
-		{
-			int num = this.width >> miplevel;
-			if (num < 1) {
-				num = 1;
+			if (_pixelData == null) return;
+			var bytes = new byte[_pixelData.Length * 4];
+			for (int i = 0; i < _pixelData.Length; i++)
+			{
+				bytes[i * 4]     = (byte)Mathf.RoundToInt(_pixelData[i].r * 255);
+				bytes[i * 4 + 1] = (byte)Mathf.RoundToInt(_pixelData[i].g * 255);
+				bytes[i * 4 + 2] = (byte)Mathf.RoundToInt(_pixelData[i].b * 255);
+				bytes[i * 4 + 3] = (byte)Mathf.RoundToInt(_pixelData[i].a * 255);
 			}
-			int num2 = this.height >> miplevel;
-			if (num2 < 1) {
-				num2 = 1;
-			}
-			return this.GetPixels (0, 0, num, num2, miplevel);
+			var img = Image.CreateFromData(_width, _height, false, Image.Format.Rgba8, bytes);
+			var tex = new ImageTexture();
+			tex.CreateFromImage(img);
+			_tex = tex;
+			if (makeNoLongerReadable) isReadable = false;
 		}
 
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern Color32[] GetPixels32 ([DefaultValue ("0")] int miplevel);
-
-		[ExcludeFromDocs]
-		public Color32[] GetPixels32 ()
+		public void LoadRawTextureData(byte[] data)
 		{
-			int miplevel = 0;
-			return this.GetPixels32 (miplevel);
-		}
-
-		public byte[] GetRawTextureData ()
-		{
-			return _texture.GetData().GetData();
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private extern bool Internal_ResizeWH (int width, int height);
-
-		public void LoadRawTextureData (byte[] data)
-		{
-			Godot.Image image = new Godot.Image();
-			Bitmap bm;
-
 			try
 			{
-				using (System.IO.MemoryStream ms = new System.IO.MemoryStream(data))
+				var img = new Image();
+				var err = img.LoadJpgFromBuffer(data);
+				if (err != Error.Ok)
+					err = img.LoadPngFromBuffer(data);
+				if (err == Error.Ok)
 				{
-					bm = new Bitmap(ms);
+					_width  = img.GetWidth();
+					_height = img.GetHeight();
+					var tex = new ImageTexture();
+					tex.CreateFromImage(img);
+					_tex = tex;
 				}
-
-				byte[] bytes = new byte[bm.Width * bm.Height * 4];
-				int bytePos = 0;
-
-				for ( int y = 0; y < bm.Height; y++)
+				else
 				{
-					for ( int x = 0; x < bm.Width; x++)
-					{
-						var color = bm.GetPixel(x, y);
-						bytes[bytePos] = color.R;
-						bytes[bytePos+1] = color.G;
-						bytes[bytePos+2] = color.B;
-						bytes[bytePos+3] = color.A;
-						bytePos += 4;
-					}
+					Debug.LogWarning("Texture2D.LoadRawTextureData: failed to load image data.");
 				}
-
-				image.CreateFromData(bm.Width, bm.Height, false, Godot.Image.Format.Rgba8, bytes);
-				_texture.CreateFromImage(image);
 			}
-			catch (System.Exception e)
+			catch (Exception e)
 			{
-				Debug.Log(e.Message + "\n\n" + e.StackTrace);
+				Debug.LogError($"Texture2D.LoadRawTextureData error: {e.Message}");
 			}
 		}
 
-		public void LoadRawTextureData (IntPtr data, int size)
+		public byte[] GetRawTextureData()
 		{
-			this.LoadRawTextureData_ImplPointer (data, size);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private extern void LoadRawTextureData_ImplPointer (IntPtr data, int size);
-
-		[ExcludeFromDocs]
-		public Rect[] PackTextures (Texture2D[] textures, int padding, int maximumAtlasSize)
-		{
-			bool makeNoLongerReadable = false;
-			return this.PackTextures (textures, padding, maximumAtlasSize, makeNoLongerReadable);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern Rect[] PackTextures (Texture2D[] textures, int padding, [DefaultValue ("2048")] int maximumAtlasSize, [DefaultValue ("false")] bool makeNoLongerReadable);
-
-		[ExcludeFromDocs]
-		public Rect[] PackTextures (Texture2D[] textures, int padding)
-		{
-			bool makeNoLongerReadable = false;
-			int maximumAtlasSize = 2048;
-			return this.PackTextures (textures, padding, maximumAtlasSize, makeNoLongerReadable);
-		}
-
-		[ExcludeFromDocs]
-		public void ReadPixels (Rect source, int destX, int destY)
-		{
-			bool recalculateMipMaps = true;
-			Texture2D.INTERNAL_CALL_ReadPixels (this, ref source, destX, destY, recalculateMipMaps);
-		}
-
-		public void ReadPixels (Rect source, int destX, int destY, [DefaultValue ("true")] bool recalculateMipMaps)
-		{
-			Texture2D.INTERNAL_CALL_ReadPixels (this, ref source, destX, destY, recalculateMipMaps);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern bool Resize (int width, int height, TextureFormat format, bool hasMipMap);
-
-		public bool Resize (int width, int height)
-		{
-			return this.Internal_ResizeWH (width, height);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private extern void SetAllPixels32 (Color32[] colors, int miplevel);
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		private extern void SetBlockOfPixels32 (int x, int y, int blockWidth, int blockHeight, Color32[] colors, int miplevel);
-
-		public void SetPixel (int x, int y, Color color)
-		{
-			Texture2D.INTERNAL_CALL_SetPixel (this, x, y, ref color);
-		}
-
-		[ExcludeFromDocs]
-		public void SetPixels (int x, int y, int blockWidth, int blockHeight, Color[] colors)
-		{
-			int miplevel = 0;
-			this.SetPixels (x, y, blockWidth, blockHeight, colors, miplevel);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern void SetPixels (int x, int y, int blockWidth, int blockHeight, Color[] colors, [DefaultValue ("0")] int miplevel);
-
-		public void SetPixels (Color[] colors, [DefaultValue ("0")] int miplevel)
-		{
-			int num = this.width >> miplevel;
-			if (num < 1) {
-				num = 1;
-			}
-			int num2 = this.height >> miplevel;
-			if (num2 < 1) {
-				num2 = 1;
-			}
-			this.SetPixels (0, 0, num, num2, colors, miplevel);
-		}
-
-		[ExcludeFromDocs]
-		public void SetPixels (Color[] colors)
-		{
-			int miplevel = 0;
-			this.SetPixels (colors, miplevel);
-		}
-
-		[ExcludeFromDocs]
-		public void SetPixels32 (int x, int y, int blockWidth, int blockHeight, Color32[] colors)
-		{
-			int miplevel = 0;
-			this.SetPixels32 (x, y, blockWidth, blockHeight, colors, miplevel);
-		}
-
-		public void SetPixels32 (Color32[] colors, [DefaultValue ("0")] int miplevel)
-		{
-			this.SetAllPixels32 (colors, miplevel);
-		}
-
-		[ExcludeFromDocs]
-		public void SetPixels32 (Color32[] colors)
-		{
-			int miplevel = 0;
-			this.SetPixels32 (colors, miplevel);
-		}
-
-		public void SetPixels32 (int x, int y, int blockWidth, int blockHeight, Color32[] colors, [DefaultValue ("0")] int miplevel)
-		{
-			this.SetBlockOfPixels32 (x, y, blockWidth, blockHeight, colors, miplevel);
-		}
-
-		[GeneratedByOldBindingsGenerator]
-		[MethodImpl (MethodImplOptions.InternalCall)]
-		public extern void UpdateExternalTexture (IntPtr nativeTex);
-
-		//
-		// Nested Types
-		//
-		[Flags]
-		public enum EXRFlags
-		{
-			None = 0,
-			OutputAsFloat = 1,
-			CompressZIP = 2,
-			CompressRLE = 4,
-			CompressPIZ = 8
-		}
-
-
-		public static Texture2D Instantiate<T>(Texture2D original) where T : Texture2D
-		{
-			Texture2D tex = new Texture2D(original.GetRawTextureData());
-			return tex;
-		}
-
-
-		public static void Destroy(Texture2D texture)
-		{
-			if ( texture != null && texture._texture != null )
+			if (_tex is ImageTexture it)
 			{
-				texture._texture.Free();
+				var img = it.GetImage();
+				if (img != null)
+					return img.GetData();
 			}
+			return Array.Empty<byte>();
+		}
+
+		public bool Resize(int width, int height, TextureFormat format = TextureFormat.RGBA32, bool hasMipMap = false)
+		{
+			_width = width;
+			_height = height;
+			this.format = format;
+			_pixelData = null;
+			var img = Image.CreateEmpty(width, height, hasMipMap, Image.Format.Rgba8);
+			var tex = new ImageTexture();
+			tex.CreateFromImage(img);
+			_tex = tex;
+			return true;
+		}
+
+		private void EnsurePixelData()
+		{
+			if (_pixelData == null)
+				_pixelData = new Color[_width * _height];
+		}
+
+		// ---- Implicit conversions ----
+		public static implicit operator Godot.Texture2D?(Texture2D? t) => t?._tex;
+
+		public static implicit operator Texture2D?(Godot.Texture2D? t)
+			=> t == null ? null : new Texture2D(t);
+
+		public static bool GenerateAtlas(Vector2[] sizes, int padding, int atlasSize, List<Rect> results)
+		{
+			if (sizes == null) throw new ArgumentException("sizes cannot be null");
+			if (results == null) throw new ArgumentException("results cannot be null");
+			results.Clear();
+			return sizes.Length == 0;
 		}
 	}
 }
+

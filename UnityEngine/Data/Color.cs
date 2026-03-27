@@ -413,5 +413,10 @@ namespace UnityEngine
 		{
 			return new Color (a.r - b.r, a.g - b.g, a.b - b.b, a.a - b.a);
 		}
+
+		public Godot.Color toGodot() => new Godot.Color(r, g, b, a);
+
+		public static implicit operator Godot.Color(Color c) => new Godot.Color(c.r, c.g, c.b, c.a);
+		public static implicit operator Color(Godot.Color c) => new Color(c.R, c.G, c.B, c.A);
 	}
 }

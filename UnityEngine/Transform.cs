@@ -1,55 +1,194 @@
-﻿using System;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using Godot;
 
 namespace UnityEngine
 {
-	public class Transform
+	public class Transform : Component, IEnumerable<Transform>
 	{
-		public Godot.Spatial spatial;
+		private Transform? _parent;
 
-		public string name { get { throw new NotImplementedException(); } set { throw new NotImplementedException(); } }
-		public GameObject gameObject { get { throw new NotImplementedException(); } set { throw new NotImplementedException(); } }
-
-
-		internal Transform(Godot.Spatial node)
+		// ---- Position / Rotation / Scale ----
+		public Vector3 localPosition
 		{
-			spatial = node;
+			get => gameObject.godot.Position;
+			set => gameObject.godot.Position = value;
 		}
 
+		public Quaternion localRotation
+		{
+			get => gameObject.godot.Quaternion;
+			set => gameObject.godot.Quaternion = value;
+		}
+
+		public Vector3 localEulerAngles
+		{
+			get => gameObject.godot.RotationDegrees;
+			set => gameObject.godot.RotationDegrees = value;
+		}
+
+		public Vector3 localScale
+		{
+			get => gameObject.godot.Scale;
+			set => gameObject.godot.Scale = value;
+		}
 
 		public Vector3 position
 		{
-			get { return spatial.Translation; }
-			set { spatial.Translation = value; }
+			get => gameObject.godot.GlobalPosition;
+			set => gameObject.godot.GlobalPosition = value;
 		}
 
-
-		public void Rotate(Vector3 eulerAngles)
+		public Quaternion rotation
 		{
-			spatial.Rotate(eulerAngles.normalized, eulerAngles.magnitude * Mathf.Deg2Rad);
+			get => gameObject.godot.GlobalTransform.Basis.GetRotationQuaternion();
+			set
+			{
+				var gt = gameObject.godot.GlobalTransform;
+				gt.Basis = new Basis(value);
+				gameObject.godot.GlobalTransform = gt;
+			}
 		}
 
-
-		public Vector3 InverseTransformPoint(Vector3 inPoint)
+		public Vector3 eulerAngles
 		{
-			throw new NotImplementedException();
+			get => rotation.eulerAngles;
+			set => rotation = Quaternion.Euler(value);
 		}
 
+		public Vector3 lossyScale => gameObject.godot.GlobalTransform.Basis.Scale;
 
-		public T GetComponent<T>()
+		// ---- Direction Vectors ----
+		public Vector3 forward
 		{
-			throw new NotImplementedException();
+			get => -gameObject.godot.GlobalTransform.Basis.Z;
+			set => LookAt(position + value, Vector3.up);
 		}
 
+		public Vector3 right => gameObject.godot.GlobalTransform.Basis.X;
+		public Vector3 up => gameObject.godot.GlobalTransform.Basis.Y;
 
-		public T GetComponentInChildren<T>()
+		// ---- Hierarchy ----
+		public Transform? parent
 		{
-			throw new NotImplementedException();
+			get => _parent;
+			set => SetParent(value);
 		}
 
+		public int childCount => gameObject.godot.GetChildCount();
 
-		public T[] GetComponentsInChildren<T>()
+		public void SetParent(Transform? newParent, bool worldPositionStays = true)
 		{
-			throw new NotImplementedException();
+			var currentParent = gameObject.godot.GetParent();
+			if (currentParent != null)
+				currentParent.CallDeferred(Node.MethodName.RemoveChild, gameObject.godot);
+
+			if (newParent != null)
+				newParent.gameObject.godot.CallDeferred(Node.MethodName.AddChild, gameObject.godot);
+
+			_parent = newParent;
 		}
+
+		public Transform? GetChild(int index)
+		{
+			var child = gameObject.godot.GetChild(index);
+			if (child is Node3D n3d)
+				return UGGameObjectHelper.GetOrCreate(n3d).transform;
+			return null;
+		}
+
+		public bool IsChildOf(Transform parent) => gameObject.godot.IsAncestorOf(parent.gameObject.godot) == false && parent.gameObject.godot.IsAncestorOf(gameObject.godot);
+
+		public Transform? Find(string name)
+		{
+			var node = gameObject.godot.FindChild(name);
+			if (node is Node3D n3d) return UGGameObjectHelper.GetOrCreate(n3d).transform;
+			return null;
+		}
+
+		// ---- Rotation helpers ----
+		public void Rotate(Vector3 eulerDegrees, Space relativeTo = Space.Self)
+		{
+			if (relativeTo == Space.Self)
+			{
+				var q = gameObject.godot.Quaternion;
+				q *= Godot.Quaternion.FromEuler((Godot.Vector3)eulerDegrees * Mathf.Deg2Rad);
+				gameObject.godot.Quaternion = q;
+			}
+			else
+			{
+				rotation = Quaternion.Euler(eulerAngles + eulerDegrees);
+			}
+		}
+
+		public void Rotate(float xAngle, float yAngle, float zAngle, Space relativeTo = Space.Self)
+			=> Rotate(new Vector3(xAngle, yAngle, zAngle), relativeTo);
+
+		public void Rotate(Vector3 axis, float angle, Space relativeTo = Space.Self)
+		{
+			var q = Quaternion.AngleAxis(angle, axis);
+			if (relativeTo == Space.Self)
+				localRotation = localRotation * q;
+			else
+				rotation = q * rotation;
+		}
+
+		public void RotateAround(Vector3 point, Vector3 axis, float angle)
+		{
+			var q = Quaternion.AngleAxis(angle, axis);
+			var diff = position - point;
+			diff = q * diff;
+			position = point + diff;
+			Rotate(axis, angle, Space.World);
+		}
+
+		public void LookAt(Vector3 worldPosition, Vector3 worldUp = default)
+		{
+			if (worldUp == default) worldUp = Vector3.up;
+			gameObject.godot.LookAt(worldPosition, worldUp);
+		}
+
+		public void LookAt(Transform target, Vector3 worldUp = default)
+			=> LookAt(target.position, worldUp);
+
+		// ---- Translate ----
+		public void Translate(Vector3 translation, Space relativeTo = Space.Self)
+		{
+			if (relativeTo == Space.Self)
+				localPosition += rotation * translation;
+			else
+				position += translation;
+		}
+
+		public void Translate(float x, float y, float z, Space relativeTo = Space.Self)
+			=> Translate(new Vector3(x, y, z), relativeTo);
+
+		// ---- Coordinate transforms ----
+		public Vector3 TransformPoint(Vector3 point)
+			=> gameObject.godot.ToGlobal(point);
+
+		public Vector3 InverseTransformPoint(Vector3 point)
+			=> gameObject.godot.ToLocal(point);
+
+		public Vector3 TransformDirection(Vector3 direction)
+			=> rotation * direction;
+
+		public Vector3 InverseTransformDirection(Vector3 direction)
+			=> Quaternion.Inverse(rotation) * direction;
+
+		// ---- IEnumerable ----
+		public IEnumerator<Transform> GetEnumerator()
+		{
+			for (int i = 0; i < childCount; i++)
+			{
+				var c = GetChild(i);
+				if (c != null) yield return c;
+			}
+		}
+
+		IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 	}
+
+	public enum Space { World, Self }
 }
