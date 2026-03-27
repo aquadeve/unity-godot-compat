@@ -4,20 +4,13 @@ namespace UnityEngine
 {
 	class SpatialVisibilityHandler : VisibilityHandler
 	{
-		public override bool IsVisible
+		public override bool IsVisible => node3D.Visible;
+
+		Node3D node3D;
+
+		public SpatialVisibilityHandler(Node3D node)
 		{
-			get
-			{
-				return spatial.Visible;
-			}
-		}
-
-		Spatial spatial;
-
-
-		public SpatialVisibilityHandler(Spatial spatial)
-		{
-			this.spatial = spatial;
+			this.node3D = node;
 		}
 	}
 }

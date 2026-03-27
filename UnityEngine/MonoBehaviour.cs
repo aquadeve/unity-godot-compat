@@ -1,34 +1,222 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using Godot;
 
 namespace UnityEngine
 {
-	[UseAsMonoBehaviour]
-	public class MonoBehaviour : Node
-    {
-        List<IEnumerator> coroutines = new List<IEnumerator>();
+	/// <summary>
+	/// Base class for all Unity scripts, wrapping Godot's Node lifecycle.
+	/// </summary>
+	public partial class MonoBehaviour : Node, IComponent
+	{
+		// ---- IComponent ----
+		private bool _enabled = true;
+		private GameObject? _gameObject;
 
-		public GameObject gameObject { get; private set; }
-
-		public string name { get { return GetName(); } set { SetName(value); } }
-
-
-		public MonoBehaviour()
+		public bool enabled
 		{
-			gameObject = new GameObject(this);
+			get => _enabled;
+			set
+			{
+				if (value != _enabled)
+				{
+					_enabled = value;
+					if (_enabled) OnComponentEnable();
+					else OnComponentDisable();
+				}
+			}
 		}
 
-		// Probably use an interface as the type contraint
-		public static void DontDestroyOnLoad(object obj)
+		public GameObject gameObject => _gameObject!;
+
+		public Transform transform => _gameObject!.transform;
+
+		public string name
 		{
-			throw new System.NotImplementedException();
+			get => Name;
+			set => Name = value;
 		}
 
-		// Probably use an interface as the type contraint
-		public static void Destroy(object obj)
+		public void InternalSetGameObject(GameObject go) => _gameObject = go;
+
+		public virtual void OnComponentEnable() { _onEnable?.Invoke(); }
+		public virtual void OnComponentDisable() { _onDisable?.Invoke(); }
+		public virtual void Init()
 		{
-			throw new System.NotImplementedException();
+			if (GetParent() == null)
+				gameObject.godot.CallDeferred(Node.MethodName.AddChild, this);
+		}
+
+		// ---- Lifecycle actions resolved via reflection ----
+		private Action? _awake;
+		private Action? _start;
+		private Action? _onEnable;
+		private Action? _update;
+		private Action? _lateUpdate;
+		private Action? _fixedUpdate;
+		private Action? _onDisable;
+		private Action? _onDestroy;
+
+		// ---- Coroutine support ----
+		private readonly List<IEnumerator> _coroutines = new();
+		private double _localTime = 0.0;
+
+		// ---- Godot lifecycle ----
+		public override void _Ready()
+		{
+			base._Ready();
+
+			// Resolve the parent as a GameObject
+			var parentNode3D = GetParent() as Node3D;
+			if (parentNode3D == null)
+			{
+				Debug.LogError($"MonoBehaviour {GetType().FullName} parent is not a Node3D!");
+				return;
+			}
+			InternalSetGameObject(UGGameObjectHelper.GetOrCreate(parentNode3D));
+
+			// Bind lifecycle methods via reflection
+			var type = GetType();
+			var methods = type.GetMethods(
+				BindingFlags.DeclaredOnly |
+				BindingFlags.NonPublic |
+				BindingFlags.Public |
+				BindingFlags.Instance);
+
+			foreach (var method in methods)
+			{
+				if (method.GetParameters().Length != 0) continue;
+				if (method.ReturnType == typeof(IEnumerator)) continue;
+				switch (method.Name)
+				{
+					case "Awake":     _awake     = (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "Start":     _start     = (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "OnEnable":  _onEnable  = (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "Update":    _update    = (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "LateUpdate":_lateUpdate= (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "FixedUpdate":_fixedUpdate=(Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "OnDisable": _onDisable = (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+					case "OnDestroy": _onDestroy = (Action)Delegate.CreateDelegate(typeof(Action), this, method); break;
+				}
+			}
+
+			_awake?.Invoke();
+			_start?.Invoke();
+			_onEnable?.Invoke();
+		}
+
+		public override void _Process(double delta)
+		{
+			base._Process(delta);
+			if (!_enabled) return;
+
+			Time.deltaTime = (float)delta;
+			_localTime += delta;
+			Time.time = (float)_localTime;
+
+			_update?.Invoke();
+			_lateUpdate?.Invoke();
+
+			// Advance coroutines
+			for (int i = _coroutines.Count - 1; i >= 0; i--)
+			{
+				try
+				{
+					if (!_coroutines[i].MoveNext())
+						_coroutines.RemoveAt(i);
+				}
+				catch (Exception e)
+				{
+					Debug.LogError($"Coroutine error: {e.Message}\n{e.StackTrace}");
+					_coroutines.RemoveAt(i);
+				}
+			}
+		}
+
+		public override void _PhysicsProcess(double delta)
+		{
+			base._PhysicsProcess(delta);
+			if (!_enabled) return;
+			Time.fixedDeltaTime = (float)delta;
+			_fixedUpdate?.Invoke();
+		}
+
+		public override void _ExitTree()
+		{
+			_onDisable?.Invoke();
+			_onDestroy?.Invoke();
+			base._ExitTree();
+		}
+
+		// ---- Unity API ----
+		public Coroutine StartCoroutine(IEnumerator routine)
+		{
+			_coroutines.Add(routine);
+			return new Coroutine(routine);
+		}
+
+		public void StopCoroutine(Coroutine coroutine)
+		{
+			if (coroutine?.enumerator != null)
+				_coroutines.Remove(coroutine.enumerator);
+		}
+
+		public void StopAllCoroutines() => _coroutines.Clear();
+
+		public static void Destroy(Object obj, float t = 0f)
+		{
+			if (obj is Node node) node.QueueFree();
+		}
+
+		public static void DestroyImmediate(Object obj)
+		{
+			if (obj is Node node) node.Free();
+		}
+
+		public static void DontDestroyOnLoad(Object obj) { /* no-op */ }
+
+		public T? GetComponent<T>() where T : class, IComponent, new()
+			=> gameObject?.GetComponent<T>();
+
+		public T[] GetComponents<T>() where T : class, IComponent, new()
+			=> gameObject?.GetComponents<T>() ?? Array.Empty<T>();
+
+		public T? GetComponentInChildren<T>() where T : class, IComponent, new()
+			=> gameObject?.GetComponentInChildren<T>();
+
+		public T[] GetComponentsInChildren<T>() where T : class, IComponent, new()
+			=> gameObject?.GetComponentsInChildren<T>() ?? Array.Empty<T>();
+
+		public bool CompareTag(string tag) => this.IsInGroup(tag);
+
+		public void Invoke(string methodName, float time) => throw new NotImplementedException();
+		public bool IsInvoking(string methodName) => false;
+		public void CancelInvoke(string methodName) { }
+		public void CancelInvoke() { }
+
+		public void SendMessage(string methodName, object? value = null) { }
+		public void SendMessageUpwards(string methodName, object? value = null) { }
+		public void BroadcastMessage(string methodName, object? value = null) { }
+
+		public static void print(object? message) => Debug.Log(message);
+	}
+
+	/// <summary>
+	/// Helper to map Node3D instances to UnityEngine GameObjects.
+	/// </summary>
+	internal static class UGGameObjectHelper
+	{
+		private static readonly System.Collections.Generic.Dictionary<Node3D, GameObject> _map = new();
+
+		public static GameObject GetOrCreate(Node3D node)
+		{
+			if (_map.TryGetValue(node, out var go))
+				return go;
+			go = new GameObject(null, node);
+			_map[node] = go;
+			return go;
 		}
 	}
 }

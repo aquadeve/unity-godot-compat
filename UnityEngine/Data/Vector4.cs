@@ -361,5 +361,17 @@ namespace UnityEngine
 		{
 			return new Vector4 (-a.x, -a.y, -a.z, -a.w);
 		}
+
+		public static implicit operator Godot.Vector4 (Vector4 v)
+		{
+			return new Godot.Vector4(v.x, v.y, v.z, v.w);
+		}
+
+		public static implicit operator Vector4 (Godot.Vector4 v)
+		{
+			return new Vector4(v.X, v.Y, v.Z, v.W);
+		}
+
+		public Godot.Vector4 toGodot() => new Godot.Vector4(x, y, z, w);
 	}
 }
